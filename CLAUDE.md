@@ -69,6 +69,17 @@ python path/to/seed-project/gen.py \
 | 導航 | 縮圖列即可 | 需要側邊欄快速跳章節 |
 | 現有範例 | aihcr-diagrams, 書籍範例 | openclaw-slides, agent-teams（多場景）|
 
+## 鐵律：永遠用 gen.py，不要複製貼上
+
+> **複製既有 index.html 再改 = 繼承所有 bug。**
+> gen.py 注入的是最新模板，功能永遠完整。
+
+| 情境 | ✅ 正確 | ❌ 錯誤 |
+|------|--------|--------|
+| 建新 Viewer | `python gen.py ...` | 複製既有 index.html |
+| 加新功能（如觸控） | 改 `templates/*.html` → 重跑 gen.py | 直接改部署的 index.html |
+| 發現某 Viewer 缺功能 | 確認模板有後重跑 gen.py | 單獨 patch 那個 Viewer |
+
 ## 新建 Viewer Repo 的完整 SOP
 
 1. **建立 GitHub Repo**
@@ -86,13 +97,21 @@ python path/to/seed-project/gen.py \
    python ~/workspace/seed-project/gen.py --mode simple --title "..." --dir ./images
    ```
 
-4. **確認本地預覽正常**（選用）
+4. **三行 Smoke Test（必做，30 秒）**
+   ```bash
+   grep -c "自動播放"    index.html   # 必須 ≥ 1
+   grep -c "dd-toggle"   index.html   # 必須 ≥ 1
+   grep -c "progress-bar" index.html  # 必須 ≥ 1
+   ```
+   任何一行輸出 `0` → 停手，修 `templates/` 再重跑，**不要手補 index.html**。
+
+5. **確認本地預覽正常**（選用）
    ```bash
    python -m http.server 8080
    # 開瀏覽器 http://localhost:8080
    ```
 
-5. **推送並啟用 GitHub Pages**
+6. **推送並啟用 GitHub Pages**
    ```bash
    git add .
    git commit -m "新增 index.html（由 seed-project gen.py 產生）"
@@ -100,7 +119,7 @@ python path/to/seed-project/gen.py \
    # GitHub Settings → Pages → Source: main / (root)
    ```
 
-6. **將 iframe 加入 mermaid-viewer**
+7. **將 iframe 加入 mermaid-viewer**
    - 在 `mermaid-viewer/index.html` 新增 tab 按鈕和 pane
    - 參考現有 tab 格式，`data-src` 填入 `https://chenghyang2001.github.io/<repo-name>/`
    - 更新 `ACTIVE_CLASS` 陣列（長度必須與 tab 數量一致）
