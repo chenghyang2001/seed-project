@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>__TITLE__</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0f172a; color: #e2e8f0; font-family: 'Segoe UI', system-ui, sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; user-select: none; }
+
+/* ── Header ── */
+#header { padding: 10px 20px; background: rgba(0,0,0,0.55); border-bottom: 1px solid #1e293b; display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+#title   { font-size: 1rem; font-weight: 600; letter-spacing: 0.04em; color: __ACCENT__; white-space: nowrap; }
+#counter { font-size: 0.85rem; color: #94a3b8; white-space: nowrap; }
+#img-label { font-size: 0.85rem; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #cbd5e1; }
+#hint { font-size: 0.68rem; color: #334155; white-space: nowrap; }
+
+/* ── Autoplay ── */
+#autoplay-wrap { position: relative; display: flex; align-items: center; flex-shrink: 0; }
+#play-btn { padding: 4px 12px; background: rgba(__ACCENT_RGB__,0.08); border: 1px solid rgba(__ACCENT_RGB__,0.25); border-right: none; color: __ACCENT_LIGHT__; font-size: 0.72rem; cursor: pointer; border-radius: 6px 0 0 6px; white-space: nowrap; transition: background 0.15s; }
+#play-btn:hover, #play-btn.playing { background: rgba(__ACCENT_RGB__,0.18); }
+#dd-toggle { padding: 4px 7px; background: rgba(__ACCENT_RGB__,0.08); border: 1px solid rgba(__ACCENT_RGB__,0.25); color: __ACCENT_LIGHT__; font-size: 0.72rem; cursor: pointer; border-radius: 0 6px 6px 0; transition: background 0.15s; }
+#dd-toggle:hover { background: rgba(__ACCENT_RGB__,0.18); }
+#auto-dropdown { position: absolute; top: calc(100% + 6px); right: 0; background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 6px 0; min-width: 130px; z-index: 100; display: none; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+#auto-dropdown.open { display: block; }
+.dd-speed { padding: 7px 16px 7px 32px; font-size: 0.75rem; color: #94a3b8; cursor: pointer; position: relative; transition: background 0.12s; }
+.dd-speed:hover { background: rgba(255,255,255,0.05); color: #e2e8f0; }
+.dd-speed.active { color: __ACCENT__; }
+.dd-speed.active::before { content: '✓'; position: absolute; left: 14px; color: __ACCENT__; }
+.dd-divider { height: 1px; background: #334155; margin: 4px 0; }
+.dd-loop { padding: 7px 16px; font-size: 0.75rem; color: #94a3b8; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: background 0.12s; }
+.dd-loop:hover { background: rgba(255,255,255,0.05); color: #e2e8f0; }
+.loop-check { width: 14px; height: 14px; border: 1.5px solid #475569; border-radius: 3px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.dd-loop.active { color: __ACCENT__; }
+.dd-loop.active .loop-check { border-color: __ACCENT__; background: rgba(__ACCENT_RGB__,0.15); }
+.dd-loop.active .loop-check::after { content: '✓'; font-size: 0.65rem; color: __ACCENT__; }
+
+/* ── Progress bar ── */
+#progress-bar { height: 3px; background: linear-gradient(90deg, __ACCENT__, __ACCENT_LIGHT__); width: 0%; flex-shrink: 0; display: none; }
+
+/* ── Main layout ── */
+#main { flex: 1; display: flex; overflow: hidden; }
+
+/* ── Sidebar ── */
+#sidebar { width: 180px; background: rgba(0,0,0,0.35); border-right: 1px solid #1e293b; overflow-y: auto; flex-shrink: 0; scrollbar-width: thin; scrollbar-color: #334155 transparent; }
+.group-btn { display: block; width: 100%; text-align: left; padding: 9px 14px; background: none; border: none; color: #64748b; font-size: 0.75rem; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.04); transition: background 0.12s, color 0.12s; line-height: 1.4; }
+.group-btn:hover { background: rgba(__ACCENT_RGB__,0.07); color: #cbd5e1; }
+.group-btn.active { background: rgba(__ACCENT_RGB__,0.12); color: __ACCENT__; border-left: 2px solid __ACCENT__; padding-left: 12px; }
+.group-count { font-size: 0.68rem; color: #334155; display: block; }
+.group-btn.active .group-count { color: rgba(__ACCENT_RGB__,0.55); }
+
+/* ── Viewer ── */
+#viewer { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+#canvas-wrap { flex: 1; position: relative; overflow: hidden; background: #0f172a; cursor: grab; }
+#canvas-wrap.dragging { cursor: grabbing; }
+#main-img { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; max-width: none; max-height: none; transition: opacity 0.18s; pointer-events: none; }
+#scale-badge { position: absolute; bottom: 12px; right: 12px; background: rgba(0,0,0,0.6); color: #94a3b8; font-size: 0.72rem; padding: 3px 8px; border-radius: 4px; pointer-events: none; z-index: 5; }
+
+/* ── Nav buttons ── */
+.nav-btn { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.14); color: #e2e8f0; font-size: 1.4rem; width: 44px; height: 80px; cursor: pointer; border-radius: 8px; z-index: 10; transition: background 0.15s; display: flex; align-items: center; justify-content: center; }
+.nav-btn:hover { background: rgba(255,255,255,0.2); }
+#prev-btn { left: 10px; }
+#next-btn { right: 10px; }
+
+/* ── Thumbnails ── */
+#thumbnails { display: flex; gap: 6px; padding: 8px 12px; background: rgba(0,0,0,0.55); border-top: 1px solid #1e293b; overflow-x: auto; flex-shrink: 0; scrollbar-width: thin; scrollbar-color: #334155 transparent; }
+.thumb { width: 72px; height: 48px; object-fit: cover; border-radius: 4px; cursor: pointer; opacity: 0.4; border: 2px solid transparent; transition: opacity 0.15s, border-color 0.15s; flex-shrink: 0; }
+.thumb.active { opacity: 1; border-color: __ACCENT__; }
+.thumb:hover:not(.active) { opacity: 0.75; }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <span id="title">__TITLE__</span>
+  <span id="counter">— / —</span>
+  <span id="img-label">載入中…</span>
+  <span id="hint">← → 換圖 · 滾輪縮放 · 雙擊還原 · Space 播放</span>
+  <div id="autoplay-wrap">
+    <button id="play-btn" title="自動播放 / 暫停 (Space)">▶ 自動播放</button>
+    <button id="dd-toggle" title="播放設定">▾</button>
+    <div id="auto-dropdown">
+      <div class="dd-speed active" data-ms="3000">每隔 3 秒</div>
+      <div class="dd-speed" data-ms="5000">每隔 5 秒</div>
+      <div class="dd-speed" data-ms="10000">每隔 10 秒</div>
+      <div class="dd-speed" data-ms="30000">每隔 30 秒</div>
+      <div class="dd-divider"></div>
+      <div class="dd-loop active" id="loop-item"><span class="loop-check"></span>循環播放</div>
+    </div>
+  </div>
+</div>
+<div id="progress-bar"></div>
+
+<div id="main">
+  <div id="sidebar"></div>
+  <div id="viewer">
+    <div id="canvas-wrap">
+      <button class="nav-btn" id="prev-btn" aria-label="上一張">&#8592;</button>
+      <img id="main-img" src="" alt="">
+      <button class="nav-btn" id="next-btn" aria-label="下一張">&#8594;</button>
+      <div id="scale-badge">100%</div>
+    </div>
+    <div id="thumbnails"></div>
+  </div>
+</div>
+
+<script>
+const GROUPS = __DATA__;
+
+const img       = document.getElementById('main-img');
+const canvas    = document.getElementById('canvas-wrap');
+const titleEl   = document.getElementById('title');
+const counterEl = document.getElementById('counter');
+const labelEl   = document.getElementById('img-label');
+const sidebarEl = document.getElementById('sidebar');
+const thumbsEl  = document.getElementById('thumbnails');
+const badge     = document.getElementById('scale-badge');
+const progBar   = document.getElementById('progress-bar');
+const playBtn   = document.getElementById('play-btn');
+const ddToggle  = document.getElementById('dd-toggle');
+const ddMenu    = document.getElementById('auto-dropdown');
+const loopItem  = document.getElementById('loop-item');
+
+let curGroup = 0, curImg = 0;
+let scale = 1, tx = 0, ty = 0;
+let dragging = false, dragX = 0, dragY = 0, txStart = 0, tyStart = 0;
+let autoSpeed = 3000, autoLoop = true, autoTimer = null, progTimer = null, progStart = 0;
+
+// ── Transform ──────────────────────────────────────────────
+function applyTransform() {
+  img.style.transform = `matrix(${scale},0,0,${scale},${tx},${ty})`;
+  badge.textContent = Math.round(scale * 100) + '%';
+}
+
+function fitImage() {
+  const vw = canvas.clientWidth, vh = canvas.clientHeight;
+  const iw = img.naturalWidth,   ih = img.naturalHeight;
+  if (!iw || !ih) return;
+  const PAD = 24;
+  scale = Math.min((vw - PAD * 2) / iw, (vh - PAD * 2) / ih);
+  tx = (vw - iw * scale) / 2;
+  ty = (vh - ih * scale) / 2;
+  applyTransform();
+}
+
+// ── Sidebar ────────────────────────────────────────────────
+GROUPS.forEach((g, gi) => {
+  const btn = document.createElement('button');
+  btn.className = 'group-btn' + (gi === 0 ? ' active' : '');
+  btn.innerHTML = `${g.label}<span class="group-count">${g.images.length} 張</span>`;
+  btn.addEventListener('click', () => loadGroup(gi));
+  sidebarEl.appendChild(btn);
+});
+
+function loadGroup(gi, imgIdx) {
+  curGroup = gi;
+  curImg = imgIdx || 0;
+  document.querySelectorAll('.group-btn').forEach((b, i) => b.classList.toggle('active', i === gi));
+  buildThumbs();
+  showImage();
+}
+
+// ── Thumbnails ─────────────────────────────────────────────
+function buildThumbs() {
+  thumbsEl.innerHTML = '';
+  GROUPS[curGroup].images.forEach((src, i) => {
+    const t = document.createElement('img');
+    t.src = src;
+    t.className = 'thumb' + (i === 0 ? ' active' : '');
+    t.title = GROUPS[curGroup].label + ' ' + (i + 1);
+    t.addEventListener('click', () => { curImg = i; showImage(); });
+    thumbsEl.appendChild(t);
+  });
+}
+
+// ── Navigation ─────────────────────────────────────────────
+function showImage() {
+  const grp = GROUPS[curGroup];
+  img.style.opacity = '0';
+  img.src = grp.images[curImg];
+  img.onload = () => { fitImage(); img.style.opacity = '1'; };
+  counterEl.textContent = `${curImg + 1} / ${grp.images.length}`;
+  labelEl.textContent = grp.label;
+  document.querySelectorAll('.thumb').forEach((t, i) => {
+    t.classList.toggle('active', i === curImg);
+    if (i === curImg) t.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+  });
+  resetAutoTimer();
+}
+
+function goNext() {
+  const grp = GROUPS[curGroup];
+  if (curImg < grp.images.length - 1) {
+    curImg++;
+    showImage();
+  } else if (curGroup < GROUPS.length - 1) {
+    loadGroup(curGroup + 1, 0);
+  } else if (autoLoop) {
+    loadGroup(0, 0);
+  } else {
+    stopAutoplay();
+  }
+}
+
+function goPrev() {
+  if (curImg > 0) { curImg--; showImage(); }
+  else if (curGroup > 0) {
+    const prevGroup = GROUPS[curGroup - 1];
+    loadGroup(curGroup - 1, prevGroup.images.length - 1);
+  }
+}
+
+// ── Keyboard ───────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if      (e.key === 'ArrowLeft')  goPrev();
+  else if (e.key === 'ArrowRight') goNext();
+  else if (e.key === 'Escape' || e.key === '0') fitImage();
+  else if (e.key === ' ') { e.preventDefault(); autoTimer ? stopAutoplay() : startAutoplay(); }
+});
+
+// ── Buttons ────────────────────────────────────────────────
+document.getElementById('prev-btn').addEventListener('click', () => goPrev());
+document.getElementById('next-btn').addEventListener('click', () => goNext());
+
+// ── Wheel zoom ─────────────────────────────────────────────
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const factor = e.deltaY < 0 ? 1.13 : 1 / 1.13;
+  const newScale = Math.min(Math.max(scale * factor, 0.1), 25);
+  const r = canvas.getBoundingClientRect();
+  const cx = e.clientX - r.left, cy = e.clientY - r.top;
+  tx = cx - (cx - tx) * (newScale / scale);
+  ty = cy - (cy - ty) * (newScale / scale);
+  scale = newScale;
+  applyTransform();
+}, { passive: false });
+
+// ── Drag to pan ────────────────────────────────────────────
+canvas.addEventListener('mousedown', e => {
+  if (e.button !== 0 || e.target.closest('.nav-btn')) return;
+  dragging = true; dragX = e.clientX; dragY = e.clientY; txStart = tx; tyStart = ty;
+  canvas.classList.add('dragging');
+});
+document.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  tx = txStart + (e.clientX - dragX);
+  ty = tyStart + (e.clientY - dragY);
+  applyTransform();
+});
+document.addEventListener('mouseup', () => { dragging = false; canvas.classList.remove('dragging'); });
+canvas.addEventListener('dblclick', fitImage);
+window.addEventListener('resize', fitImage);
+
+// ── Autoplay ───────────────────────────────────────────────
+function startAutoplay() {
+  clearInterval(autoTimer); clearInterval(progTimer);
+  progStart = Date.now();
+  autoTimer = setInterval(autoAdvance, autoSpeed);
+  progTimer = setInterval(() => {
+    progBar.style.width = Math.min(((Date.now() - progStart) / autoSpeed) * 100, 100) + '%';
+  }, 50);
+  progBar.style.display = 'block'; progBar.style.width = '0%';
+  playBtn.textContent = '⏸ 暫停'; playBtn.classList.add('playing');
+}
+function stopAutoplay() {
+  clearInterval(autoTimer); clearInterval(progTimer); autoTimer = progTimer = null;
+  progBar.style.width = '0%'; progBar.style.display = 'none';
+  playBtn.textContent = '▶ 自動播放'; playBtn.classList.remove('playing');
+}
+function autoAdvance() {
+  const grp = GROUPS[curGroup];
+  if (curImg < grp.images.length - 1) {
+    curImg++; showImage();
+  } else if (curGroup < GROUPS.length - 1) {
+    stopAutoplay();
+    loadGroup(curGroup + 1, 0);
+    startAutoplay();
+  } else if (autoLoop) {
+    stopAutoplay();
+    loadGroup(0, 0);
+    startAutoplay();
+  } else {
+    stopAutoplay();
+  }
+}
+function resetAutoTimer() {
+  if (!autoTimer) return;
+  clearInterval(autoTimer); clearInterval(progTimer);
+  progStart = Date.now();
+  autoTimer = setInterval(autoAdvance, autoSpeed);
+  progTimer = setInterval(() => {
+    progBar.style.width = Math.min(((Date.now() - progStart) / autoSpeed) * 100, 100) + '%';
+  }, 50);
+  progBar.style.width = '0%';
+}
+
+playBtn.addEventListener('click', () => autoTimer ? stopAutoplay() : startAutoplay());
+ddToggle.addEventListener('click', e => { e.stopPropagation(); ddMenu.classList.toggle('open'); });
+document.addEventListener('click', () => ddMenu.classList.remove('open'));
+ddMenu.addEventListener('click', e => e.stopPropagation());
+document.querySelectorAll('.dd-speed').forEach(el => {
+  el.addEventListener('click', () => {
+    autoSpeed = parseInt(el.dataset.ms);
+    document.querySelectorAll('.dd-speed').forEach(s => s.classList.remove('active'));
+    el.classList.add('active');
+    if (autoTimer) { clearInterval(autoTimer); autoTimer = setInterval(autoAdvance, autoSpeed); progStart = Date.now(); }
+  });
+});
+loopItem.addEventListener('click', () => { autoLoop = !autoLoop; loopItem.classList.toggle('active', autoLoop); });
+
+// ── Init ───────────────────────────────────────────────────
+loadGroup(0, 0);
+</script>
+</body>
+</html>
